@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-Thank you for your interest in contributing to `scorpio_description`.
+Thank you for your interest in contributing to `scorpio_navigation`.
 Whether it's a bug report, new feature, correction, or additional
 documentation, we greatly value feedback and contributions from our community.
 
@@ -58,6 +58,6 @@ be under the Apache 2 License, as dictated by that
    with Licensor regarding such Contributions.
 ~~~
 
-[issues]: https://github.com/scorpio-robot/scorpio_description/issues
-[closed-issues]: https://github.com/scorpio-robot/scorpio_description/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aclosed%20
-[help-wanted]: https://github.com/scorpio-robot/scorpio_description/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22
+[issues]: https://github.com/scorpio-robot/scorpio_navigation/issues
+[closed-issues]: https://github.com/scorpio-robot/scorpio_navigation/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aclosed%20
+[help-wanted]: https://github.com/scorpio-robot/scorpio_navigation/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22
