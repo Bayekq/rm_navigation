@@ -49,6 +49,10 @@ private:
     const tf2::Transform & transform, const std::string & parent_frame,
     const std::string & child_frame, const rclcpp::Time & stamp);
 
+  void publishOdometry(
+    const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
+    const rclcpp::Time & stamp);
+
   bool getTransformAtTime(
     const rclcpp::Time & target_time, tf2::Transform & tf_odom_to_lidar_odom_out,
     tf2::Transform & tf_lidar_odom_to_lidar_out);

@@ -36,7 +36,7 @@ The main node that handles coordinate frame transformations for LiDAR SLAM integ
 | `registered_scan` | `sensor_msgs/msg/PointCloud2` | Transformed point cloud in the global `odom_frame` (for mapping and navigation) |
 | `sensor_scan` | `sensor_msgs/msg/PointCloud2` | Transformed point cloud in the `lidar_frame` (for local perception and obstacle avoidance) |
 | `map_cloud` | `sensor_msgs/msg/PointCloud2` | Transformed map point cloud in the global `odom_frame` |
-| `lidar_odometry` | `nav_msgs/msg/Odometry` | Transformed odometry in the global `odom_frame` |
+| `state_estimation` | `nav_msgs/msg/Odometry` | Transformed odometry in the global `odom_frame` |
 
 ### TF Broadcasts
 

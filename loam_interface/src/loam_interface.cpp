@@ -48,7 +48,7 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
   pcd_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("registered_scan", 5);
   sensor_scan_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("sensor_scan", 5);
   map_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("map_cloud", 5);
-  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("lidar_odometry", 5);
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("state_estimation", 5);
 
   pcd_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     registered_scan_topic_, 5,
@@ -146,42 +146,12 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
     }
   }
 
-  // Publish transformed odometry
-  nav_msgs::msg::Odometry out;
-  out.header.stamp = msg->header.stamp;
-  out.header.frame_id = odom_frame_;
-  out.child_frame_id = lidar_frame_;
-
-  const auto & origin = tf_odom_to_lidar.getOrigin();
-  out.pose.pose.position.x = origin.x();
-  out.pose.pose.position.y = origin.y();
-  out.pose.pose.position.z = origin.z();
-  out.pose.pose.orientation = tf2::toMsg(tf_odom_to_lidar.getRotation());
-
-  odom_pub_->publish(out);
-
-  // Publish TF: odom_frame -> base_frame
   // Calculate transform from odom to base_frame
   tf2::Transform tf_lidar_to_base = getTransform(lidar_frame_, base_frame_, msg->header.stamp);
   tf2::Transform tf_odom_to_base = tf_odom_to_lidar * tf_lidar_to_base;
 
   publishTransform(tf_odom_to_base, odom_frame_, base_frame_, msg->header.stamp);
-
-  // auto print_tf = [this](const std::string & name, const tf2::Transform & tf) {
-  //   double roll, pitch, yaw;
-  //   tf2::Matrix3x3(tf.getRotation()).getRPY(roll, pitch, yaw);
-  //   const auto & o = tf.getOrigin();
-  //   RCLCPP_INFO(
-  //     this->get_logger(), "%s: x=%.2f y=%.2f z=%.2f roll=%.2f pitch=%.2f yaw=%.2f", name.c_str(),
-  //     o.x(), o.y(), o.z(), roll, pitch, yaw);
-  // };
-
-  // print_tf("tf_odom_to_base", tf_odom_to_base);
-  // print_tf("tf_odom_to_lidar", tf_odom_to_lidar);
-  // print_tf("tf_lidar_to_base", tf_lidar_to_base);
-  // print_tf("tf_odom_to_lidar_odom_", tf_odom_to_lidar_odom_);
-  // print_tf("tf_lidar_odom_to_lidar_", tf_lidar_odom_to_lidar_);
-  // RCLCPP_INFO(this->get_logger(), "--------");
+  publishOdometry(tf_odom_to_base, odom_frame_, robot_base_frame_, msg->header.stamp);
 }
 
 tf2::Transform LoamInterfaceNode::getTransform(
@@ -209,6 +179,50 @@ void LoamInterfaceNode::publishTransform(
   transform_msg.child_frame_id = child_frame;
   transform_msg.transform = tf2::toMsg(transform);
   tf_broadcaster_->sendTransform(transform_msg);
+}
+
+void LoamInterfaceNode::publishOdometry(
+  const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
+  const rclcpp::Time & stamp)
+{
+  nav_msgs::msg::Odometry out;
+  out.header.stamp = stamp;
+  out.header.frame_id = parent_frame;
+  out.child_frame_id = child_frame;
+
+  const auto & origin = transform.getOrigin();
+  out.pose.pose.position.x = origin.x();
+  out.pose.pose.position.y = origin.y();
+  out.pose.pose.position.z = origin.z();
+  out.pose.pose.orientation = tf2::toMsg(transform.getRotation());
+
+  static tf2::Transform previous_transform;
+  static auto previous_time = std::chrono::steady_clock::now();
+  const auto current_time = std::chrono::steady_clock::now();
+
+  const double dt =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(current_time - previous_time).count() *
+    1e-9;
+
+  if (dt > 0) {
+    const auto linear_velocity = (transform.getOrigin() - previous_transform.getOrigin()) / dt;
+
+    const tf2::Quaternion q_diff =
+      transform.getRotation() * previous_transform.getRotation().inverse();
+    const auto angular_velocity = q_diff.getAxis() * q_diff.getAngle() / dt;
+
+    out.twist.twist.linear.x = linear_velocity.x();
+    out.twist.twist.linear.y = linear_velocity.y();
+    out.twist.twist.linear.z = linear_velocity.z();
+    out.twist.twist.angular.x = angular_velocity.x();
+    out.twist.twist.angular.y = angular_velocity.y();
+    out.twist.twist.angular.z = angular_velocity.z();
+  }
+
+  previous_transform = transform;
+  previous_time = current_time;
+
+  odom_pub_->publish(out);
 }
 
 bool LoamInterfaceNode::getTransformAtTime(
