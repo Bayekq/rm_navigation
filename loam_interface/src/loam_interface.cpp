@@ -64,28 +64,14 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
 
 void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
 {
-  // Get transform at point cloud timestamp for time synchronization
-  tf2::Transform tf_odom_to_lidar_odom_sync;
-  tf2::Transform tf_lidar_odom_to_lidar_sync;
-
-  if (!getTransformAtTime(
-        msg->header.stamp, tf_odom_to_lidar_odom_sync, tf_lidar_odom_to_lidar_sync)) {
-    RCLCPP_WARN_THROTTLE(
-      this->get_logger(), *this->get_clock(), 1000,
-      "No transform available for point cloud timestamp, using latest");
-    tf_odom_to_lidar_odom_sync = tf_odom_to_lidar_odom_;
-    tf_lidar_odom_to_lidar_sync = tf_lidar_odom_to_lidar_;
-  }
-
   // Transform to odom_frame for registered_scan
   auto registered_scan = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl_ros::transformPointCloud(odom_frame_, tf_odom_to_lidar_odom_sync, *msg, *registered_scan);
+  pcl_ros::transformPointCloud(odom_frame_, tf_odom_to_lidar_odom_, *msg, *registered_scan);
   pcd_pub_->publish(*registered_scan);
 
   // Transform to lidar_frame for sensor_scan
   auto sensor_scan = std::make_shared<sensor_msgs::msg::PointCloud2>();
-  pcl_ros::transformPointCloud(
-    lidar_frame_, tf_lidar_odom_to_lidar_sync.inverse(), *msg, *sensor_scan);
+  pcl_ros::transformPointCloud(lidar_frame_, tf_lidar_odom_to_lidar_.inverse(), *msg, *sensor_scan);
   sensor_scan_pub_->publish(*sensor_scan);
 }
 
@@ -133,21 +119,6 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar_;
   publishOdometry(
     tf_odom_to_lidar, odom_frame_, lidar_frame_, msg->header.stamp, lidar_odometry_pub_);
-
-  // Cache transform for time-synchronized point cloud processing
-  {
-    std::lock_guard<std::mutex> lock(transform_mutex_);
-    TransformStamped ts;
-    ts.stamp = msg->header.stamp;
-    ts.tf_odom_to_lidar_odom = tf_odom_to_lidar_odom_;
-    ts.tf_lidar_odom_to_lidar = tf_lidar_odom_to_lidar_;
-    transform_history_.push_back(ts);
-
-    // Keep history size limited
-    if (transform_history_.size() > MAX_HISTORY_SIZE) {
-      transform_history_.pop_front();
-    }
-  }
 
   // Calculate transform from odom to base_frame
   tf2::Transform tf_lidar_to_base = getTransform(lidar_frame_, base_frame_, msg->header.stamp);
@@ -228,41 +199,6 @@ void LoamInterfaceNode::publishOdometry(
   previous_time = current_time;
 
   pub->publish(out);
-}
-
-bool LoamInterfaceNode::getTransformAtTime(
-  const rclcpp::Time & target_time, tf2::Transform & tf_odom_to_lidar_odom_out,
-  tf2::Transform & tf_lidar_odom_to_lidar_out)
-{
-  std::lock_guard<std::mutex> lock(transform_mutex_);
-
-  if (transform_history_.empty()) {
-    return false;
-  }
-
-  // Find closest transform by timestamp
-  auto closest_it = transform_history_.begin();
-  double min_time_diff = std::abs((target_time - closest_it->stamp).seconds());
-
-  for (auto it = transform_history_.begin(); it != transform_history_.end(); ++it) {
-    double time_diff = std::abs((target_time - it->stamp).seconds());
-    if (time_diff < min_time_diff) {
-      min_time_diff = time_diff;
-      closest_it = it;
-    }
-  }
-
-  // Check if time difference is acceptable
-  if (min_time_diff > MAX_TIME_DIFF_SEC) {
-    RCLCPP_WARN(
-      this->get_logger(), "Time difference too large: %.3f sec (threshold: %.3f sec)",
-      min_time_diff, MAX_TIME_DIFF_SEC);
-    return false;
-  }
-
-  tf_odom_to_lidar_odom_out = closest_it->tf_odom_to_lidar_odom;
-  tf_lidar_odom_to_lidar_out = closest_it->tf_lidar_odom_to_lidar;
-  return true;
 }
 
 }  // namespace loam_interface
