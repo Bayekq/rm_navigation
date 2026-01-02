@@ -48,7 +48,8 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
   pcd_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("registered_scan", 5);
   sensor_scan_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("sensor_scan", 5);
   map_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("map_cloud", 5);
-  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("state_estimation", 5);
+  base_odometry_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("state_estimation", 5);
+  lidar_odometry_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("lidar_odometry", 5);
 
   pcd_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     registered_scan_topic_, 5,
@@ -130,6 +131,8 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   // Transform the odometry_msg (based on lidar_odom) to the odom frame
   tf2::fromMsg(msg->pose.pose, tf_lidar_odom_to_lidar_);
   tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar_;
+  publishOdometry(
+    tf_odom_to_lidar, odom_frame_, lidar_frame_, msg->header.stamp, lidar_odometry_pub_);
 
   // Cache transform for time-synchronized point cloud processing
   {
@@ -151,7 +154,8 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   tf2::Transform tf_odom_to_base = tf_odom_to_lidar * tf_lidar_to_base;
 
   publishTransform(tf_odom_to_base, odom_frame_, base_frame_, msg->header.stamp);
-  publishOdometry(tf_odom_to_base, odom_frame_, robot_base_frame_, msg->header.stamp);
+  publishOdometry(
+    tf_odom_to_base, odom_frame_, robot_base_frame_, msg->header.stamp, base_odometry_pub_);
 }
 
 tf2::Transform LoamInterfaceNode::getTransform(
@@ -182,8 +186,9 @@ void LoamInterfaceNode::publishTransform(
 }
 
 void LoamInterfaceNode::publishOdometry(
-  const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
-  const rclcpp::Time & stamp)
+  const tf2::Transform & transform, const std::string & parent_frame,
+  const std::string & child_frame, const rclcpp::Time & stamp,
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub)
 {
   nav_msgs::msg::Odometry out;
   out.header.stamp = stamp;
@@ -222,7 +227,7 @@ void LoamInterfaceNode::publishOdometry(
   previous_transform = transform;
   previous_time = current_time;
 
-  odom_pub_->publish(out);
+  pub->publish(out);
 }
 
 bool LoamInterfaceNode::getTransformAtTime(

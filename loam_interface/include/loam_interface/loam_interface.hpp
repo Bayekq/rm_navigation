@@ -50,8 +50,9 @@ private:
     const std::string & child_frame, const rclcpp::Time & stamp);
 
   void publishOdometry(
-    const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
-    const rclcpp::Time & stamp);
+    const tf2::Transform & transform, const std::string & parent_frame,
+    const std::string & child_frame, const rclcpp::Time & stamp,
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub);
 
   bool getTransformAtTime(
     const rclcpp::Time & target_time, tf2::Transform & tf_odom_to_lidar_odom_out,
@@ -64,7 +65,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pcd_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_scan_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_cloud_pub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr base_odometry_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr lidar_odometry_pub_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
