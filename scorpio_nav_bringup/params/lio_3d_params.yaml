@@ -19,7 +19,7 @@ keyframe:
   min_active_points_rate: 0.8
 
 scan_cloud_preprocess:
-  clip_range: 1.0
+  clip_range: 0.6
   filter_size: 0.1
 
 normal_map:
