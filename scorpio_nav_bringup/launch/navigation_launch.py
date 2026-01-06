@@ -129,6 +129,26 @@ def generate_launch_description():
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
             ),
+            Node(
+                package="terrain_analysis",
+                executable="terrain_analysis_node",
+                name="terrain_analysis",
+                output="screen",
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
+                arguments=["--ros-args", "--log-level", log_level],
+            ),
+            Node(
+                package="terrain_analysis_ext",
+                executable="terrain_analysis_ext_node",
+                name="terrain_analysis_ext",
+                output="screen",
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
+                arguments=["--ros-args", "--log-level", log_level],
+            ),
         ],
     )
 

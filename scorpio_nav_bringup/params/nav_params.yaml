@@ -47,3 +47,57 @@ slam_3d_node:
     map_frame: "pslam/map"
     # odometry and imu frames are defined in lio_3d_config.yaml
     publish_tf: false  # Whether to publish TF transform from `map_frame` to `odom_frame`
+
+terrain_analysis:
+  ros__parameters:
+    odom_frame: "odom"
+    lidar_frame: "mid360"
+    scan_voxel_size: 0.05
+    decay_time: 2.0
+    no_decay_dis: 4.0
+    clearing_dis: 8.0
+    use_sorting: true
+    quantile_z: 0.25
+    consider_drop: false
+    limit_ground_lift: false
+    max_ground_lift: 0.15
+    clear_dy_obs: false
+    min_dy_obs_dis: 0.3
+    abs_dy_obs_rel_z_thre: 0.2
+    min_dy_obs_vfov: -16.0
+    max_dy_obs_vfov: 16.0
+    min_dy_obs_point_num: 1
+    min_out_of_fov_point_num: 2
+    obstacle_height_thre: 0.2
+    no_data_obstacle: false
+    no_data_block_skip_num: 0
+    min_block_point_num: 10
+    vehicle_height: 1.5
+    min_rel_z: -1.5
+    max_rel_z: 0.2
+    dis_ratio_z: 0.2
+    voxel_point_update_thre: 100
+    voxel_time_update_thre: 2.0
+
+terrain_analysis_ext:
+  ros__parameters:
+    odom_frame: odom
+    lidar_frame: mid360
+    terrain_voxel_size: 2.0
+    terrain_voxel_width: 41
+    planar_voxel_size: 0.4
+    planar_voxel_width: 101
+    voxel_point_count_thre: 100
+    ground_elevation_thre: 0.5
+    use_terrain_dyn_thre: 1.5
+    check_terrain_conn: true
+    terrain_under_vehicle: -0.75
+    ceiling_filtering_thre: 2.0
+    local_terrain_map_radius: 4.0
+    downsize_filter_corner: 0.2
+    downsize_filter_surface: 0.1
+    point_decay_period: 10
+    point_decay_ratio: 0.5
+    vertical_angle_thre: 0.0
+    max_terrain_angle: 30.0
+    ground_z_thre: 0.1
