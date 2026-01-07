@@ -34,7 +34,9 @@ public:
   explicit LoamInterfaceNode(const rclcpp::NodeOptions & options);
 
 private:
-  void pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  void registeredScanCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+
+  void sensorScanCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
 
   void odometryCallback(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
 
@@ -68,6 +70,7 @@ private:
 
   std::string loam_odometry_topic_;
   std::string registered_scan_topic_;
+  std::string sensor_scan_topic_;
   std::string map_cloud_topic_;
   std::string odom_frame_;
   std::string lidar_frame_;
@@ -77,6 +80,7 @@ private:
   bool base_frame_to_lidar_initialized_;
   tf2::Transform tf_odom_to_lidar_odom_;
   tf2::Transform tf_lidar_odom_to_lidar_;
+  tf2::Transform tf_odom_to_lidar_;
 };
 
 }  // namespace loam_interface

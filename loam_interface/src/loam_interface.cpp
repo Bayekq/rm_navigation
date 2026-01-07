@@ -23,9 +23,10 @@ namespace loam_interface
 LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
 : Node("loam_interface", options)
 {
-  this->declare_parameter<std::string>("loam_odometry_topic", "pslam/imu_odom");
-  this->declare_parameter<std::string>("registered_scan_topic", "pslam/aligned_scan_cloud");
-  this->declare_parameter<std::string>("map_cloud_topic", "pslam/lio_map_cloud");
+  this->declare_parameter<std::string>("loam_odometry_topic", "");
+  this->declare_parameter<std::string>("sensor_scan_topic", "");
+  this->declare_parameter<std::string>("registered_scan_topic", "");
+  this->declare_parameter<std::string>("map_cloud_topic", "");
   this->declare_parameter<std::string>("odom_frame", "odom");
   this->declare_parameter<std::string>("base_frame", "base_footprint");
   this->declare_parameter<std::string>("lidar_frame", "mid360");
@@ -33,11 +34,16 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
 
   this->get_parameter("loam_odometry_topic", loam_odometry_topic_);
   this->get_parameter("registered_scan_topic", registered_scan_topic_);
+  this->get_parameter("sensor_scan_topic", sensor_scan_topic_);
   this->get_parameter("map_cloud_topic", map_cloud_topic_);
   this->get_parameter("odom_frame", odom_frame_);
   this->get_parameter("base_frame", base_frame_);
   this->get_parameter("lidar_frame", lidar_frame_);
   this->get_parameter("robot_base_frame", robot_base_frame_);
+
+  if (loam_odometry_topic_.empty()) {
+    RCLCPP_ERROR(this->get_logger(), "loam_odometry_topic is empty");
+  }
 
   base_frame_to_lidar_initialized_ = false;
 
@@ -51,9 +57,16 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
   base_odometry_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("state_estimation", 5);
   lidar_odometry_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("lidar_odometry", 5);
 
-  pcd_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    registered_scan_topic_, 5,
-    std::bind(&LoamInterfaceNode::pointCloudCallback, this, std::placeholders::_1));
+  if (!registered_scan_topic_.empty()) {
+    pcd_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+      registered_scan_topic_, 5,
+      std::bind(&LoamInterfaceNode::registeredScanCallback, this, std::placeholders::_1));
+  } else if (!sensor_scan_topic_.empty()) {
+    pcd_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+      sensor_scan_topic_, 5,
+      std::bind(&LoamInterfaceNode::sensorScanCallback, this, std::placeholders::_1));
+  }
+
   map_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     map_cloud_topic_, rclcpp::QoS(1).transient_local().reliable(),
     std::bind(&LoamInterfaceNode::mapCloudCallback, this, std::placeholders::_1));
@@ -62,7 +75,8 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
     std::bind(&LoamInterfaceNode::odometryCallback, this, std::placeholders::_1));
 }
 
-void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
+void LoamInterfaceNode::registeredScanCallback(
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
 {
   // Transform to odom_frame for registered_scan
   auto registered_scan = std::make_shared<sensor_msgs::msg::PointCloud2>();
@@ -72,6 +86,19 @@ void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::
   // Transform to lidar_frame for sensor_scan
   auto sensor_scan = std::make_shared<sensor_msgs::msg::PointCloud2>();
   pcl_ros::transformPointCloud(lidar_frame_, tf_lidar_odom_to_lidar_.inverse(), *msg, *sensor_scan);
+  sensor_scan_pub_->publish(*sensor_scan);
+}
+
+void LoamInterfaceNode::sensorScanCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
+{
+  // Transform to odom_frame for registered_scan
+  auto registered_scan = std::make_shared<sensor_msgs::msg::PointCloud2>();
+  pcl_ros::transformPointCloud(odom_frame_, tf_odom_to_lidar_, *msg, *registered_scan);
+  pcd_pub_->publish(*registered_scan);
+
+  // Transform to lidar_frame for sensor_scan
+  auto sensor_scan = std::make_shared<sensor_msgs::msg::PointCloud2>(*msg);
+  sensor_scan->header.frame_id = lidar_frame_;
   sensor_scan_pub_->publish(*sensor_scan);
 }
 
@@ -116,13 +143,13 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
 
   // Transform the odometry_msg (based on lidar_odom) to the odom frame
   tf2::fromMsg(msg->pose.pose, tf_lidar_odom_to_lidar_);
-  tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar_;
+  tf_odom_to_lidar_ = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar_;
   publishOdometry(
-    tf_odom_to_lidar, odom_frame_, lidar_frame_, msg->header.stamp, lidar_odometry_pub_);
+    tf_odom_to_lidar_, odom_frame_, lidar_frame_, msg->header.stamp, lidar_odometry_pub_);
 
   // Calculate transform from odom to base_frame
   tf2::Transform tf_lidar_to_base = getTransform(lidar_frame_, base_frame_, msg->header.stamp);
-  tf2::Transform tf_odom_to_base = tf_odom_to_lidar * tf_lidar_to_base;
+  tf2::Transform tf_odom_to_base = tf_odom_to_lidar_ * tf_lidar_to_base;
 
   publishTransform(tf_odom_to_base, odom_frame_, base_frame_, msg->header.stamp);
   publishOdometry(
