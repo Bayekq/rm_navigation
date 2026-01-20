@@ -10,3 +10,6 @@
 [submodule "local_planner"]
 	path = local_planner
 	url = https://github.com/Bayekq/local_planner.git
+[submodule "merge_cloud"]
+	path = merge_cloud
+	url = https://github.com/Bayekq/merge_cloud.git
